@@ -25,38 +25,36 @@ def parseExpiresAsDT(exp):
 	return t.replace(tzinfo=timezone.utc)
 
 def initDB():
-	db = sqlite3.connect(DBPATH)
-	c = db.cursor()
-	
-	#TODO odd note: feed_type is 1 for steam community announcements (feedname == 'steam_community_announcements') and 0 otherwise
-	# this seems to be connected to the use of psuedo bbcode
-	#see https://steamcommunity.com/comment/Recommendation/formattinghelp
-	
-	c.execute('''CREATE TABLE AppIDsCache (appid INTEGER PRIMARY KEY, name TEXT)''')
-	c.execute('''CREATE TABLE LastFetchStatus (appid INTEGER PRIMARY KEY, status)''')
-	c.execute('''CREATE TABLE NewsItems (
-		gid TEXT PRIMARY KEY,
-		title TEXT,
-		url TEXT, 
-		is_external_url TEXT,
-		author TEXT,
-		contents TEXT,
-		feedlabel TEXT,
-		date INTEGER,
-		feedname TEXT,
-		feed_type INTEGER,
-		appid INTEGER
-		)''')
-	
-	db.commit()
-	db.close()
-	
+	with sqlite3.connect(DBPATH) as db:
+		c = db.cursor()
+		
+		#TODO odd note: feed_type is 1 for steam community announcements (feedname == 'steam_community_announcements') and 0 otherwise
+		# this seems to be connected to the use of psuedo bbcode
+		#see https://steamcommunity.com/comment/Recommendation/formattinghelp
+		
+		c.execute('''CREATE TABLE Games (appid INTEGER PRIMARY KEY, name TEXT NOT NULL, shouldFetch INTEGER NOT NULL DEFAULT 1)''')
+		c.execute('''CREATE TABLE ExpireTimes (appid INTEGER PRIMARY KEY, unixseconds INTEGER NOT NULL DEFAULT 0)''')
+		c.execute('''CREATE TABLE NewsItems (
+			gid TEXT NOT NULL PRIMARY KEY,
+			title TEXT,
+			url TEXT,
+			is_external_url INTEGER,
+			author TEXT,
+			contents TEXT,
+			feedlabel TEXT,
+			date INTEGER,
+			feedname TEXT,
+			feed_type INTEGER,
+			appid INTEGER
+			)''')
+		c.execute('''CREATE TABLE NewsSources (gid TEXT NOT NULL, appid INTEGER NOT NULL, PRIMARY KEY(gid, appid))''')
+		db.commit()
+
+
 def insertNewsItem(ned):
-	db = sqlite3.connect(DBPATH)
-	db.row_factory = sqlite3.Row
-	c = db.cursor()
-	try:
-		c.execute('INSERT OR ABORT INTO NewsItems VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+	with sqlite3.connect(DBPATH) as db:
+		c = db.cursor()
+		c.execute('INSERT OR IGNORE INTO NewsItems VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 			(ned['gid'],
 			ned['title'],
 			ned['url'],
@@ -69,26 +67,11 @@ def insertNewsItem(ned):
 			ned['feed_type'],
 			ned['appid'])
 		)
+		c.execute('INSERT OR IGNORE INTO NewsSources VALUES (?, ?)',
+			(ned['gid'], ned['realappid']))
+		
 		db.commit()
-	except sqlite3.IntegrityError:
-		del ned['contents']
-		ned['is_external_url'] = '1' if ned['is_external_url'] else '0'
-		
-		print('failed to insert:')
-		print(ned)
-		
-		c.execute('select * from NewsItems WHERE gid = ?', (ned['gid'],))
-		row = c.fetchone()
-		d = dict(row)
-		del d['contents']
-		
-		if d == ned:
-			print('it\'s a perfect dupe')
-		else:
-			print('already present:')
-			print(d)
-	
-	db.close()
+
 
 # given vanity url, produce a dict of appids to names of games owned (appids are strings)
 # parses unofficial XML API of a Steam user's game list
@@ -169,7 +152,7 @@ if __name__ == '__main__':
 		news = getNewsForAppID(id)
 		if 'appnews' in news: #success
 			for ned in news['appnews']['newsitems']:
-				#ned['realappid'] = id
+				ned['realappid'] = id
 				insertNewsItem(ned)
 				
 			count = news['appnews']['count']
