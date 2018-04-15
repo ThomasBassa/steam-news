@@ -153,7 +153,7 @@ def isNewsCached(appid):
 		if exptime is None:
 			return False
 		else:
-			return exptime[0] < time.time()
+			return time.time() < exptime[0]
 	
 # Is this news item more than 30 days old?
 def isNewsOld(ned):
