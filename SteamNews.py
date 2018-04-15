@@ -10,6 +10,8 @@ import xml.dom.minidom #Maybe replace this one...
 
 DBPATH = 'SteamNews.db'
 
+## Date/time manipulation
+
 def getExpiresDTFromResponse(response):
 	exp = response.getheader('Expires')
 	if exp is None:
@@ -24,6 +26,8 @@ def parseExpiresAsDT(exp):
 	#So we're going to assume it's always GMT/UTC
 	return t.replace(tzinfo=timezone.utc)
 
+## Initialization related
+	
 def initDB():
 	with sqlite3.connect(DBPATH) as db:
 		c = db.cursor()
@@ -50,6 +54,17 @@ def initDB():
 		c.execute('''CREATE TABLE NewsSources (gid TEXT NOT NULL, appid INTEGER NOT NULL, PRIMARY KEY(gid, appid))''')
 		db.commit()
 
+def populateGames(gamedict):
+	with sqlite3.connect(DBPATH) as db:
+		c = db.cursor()
+		for appid, name in gamedict.items():
+			c.execute('INSERT OR IGNORE INTO Games VALUES (?, ?, 1)', (appid, name))
+			
+def getGamesToFetch():
+	with sqlite3.connect(DBPATH) as db:
+		c = db.cursor()
+		c.execute('SELECT appid, name FROM Games WHERE shouldFetch != 0')
+		return dict(c.fetchall())
 
 def insertNewsItem(ned):
 	with sqlite3.connect(DBPATH) as db:
