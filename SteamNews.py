@@ -118,13 +118,6 @@ def getSteamNewsAppIDs():
 		('613220', 'Steam 360 Video Player')
 	])
 
-# Just read IDs from a hardcoded file into a list
-def getTestNewsIDs():
-	ids = []
-	with open('SteamNewsIDs.txt') as f:
-		ids = f.read().splitlines()
-	return ids
-
 # Get news for the given appid as a dict
 def getNewsForAppID(appid):
 	url = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?format=json&maxlength=0&count=5&appid={}'.format(appid)
@@ -145,23 +138,18 @@ def getNewsForAppID(appid):
 # https://bendodson.com/weblog/2016/05/17/fetching-rss-feeds-for-steam-game-updates/
 # http://www.getoffmalawn.com/blog/rss-feeds-for-steam-games
 
-
-if __name__ == '__main__':
-	# print(getAppIDsFromVanity('vidios'))
-	# print(getSteamNewsAppIDs())
-	# initDB()
-	# news = getNewsForAppID(105600)
-	
-	
-	# NewsIDs test
-	# newsids = getTestNewsIDs()
-	# Using real info
+def seedVidiosDB():
 	newsids = getAppIDsFromVanity('vidios')
 	newsids.update(getSteamNewsAppIDs())
+	populateGames(newsids)
+
+if __name__ == '__main__':
+	newsids = getGamesToFetch()
 	
 	good = []
 	empty = []
 	block = []
+	
 	for id, name in newsids.items():
 		print('{} ({})'.format(name, id))
 		news = getNewsForAppID(id)
