@@ -166,7 +166,7 @@ def saveRecentNews(news):
 	with sqlite3.connect(DBPATH) as db:
 		c = db.cursor()
 		#c.execute('''CREATE TABLE ExpireTimes (appid INTEGER PRIMARY KEY, unixseconds INTEGER NOT NULL DEFAULT 0)''')
-		c.execute('INSERT OR REPLACE INTO ExpireTime VALUES (?, ?)', (news['appnews']['appid'], news['expires']))
+		c.execute('INSERT OR REPLACE INTO ExpireTimes VALUES (?, ?)', (news['appnews']['appid'], news['expires']))
 		db.commit()
 		
 	for ned in news['appnews']['newsitems']:
