@@ -1,3 +1,4 @@
+appid|name|status
 7|Steam Client|Empty
 8|winui2|Empty
 753|Steam|Good
