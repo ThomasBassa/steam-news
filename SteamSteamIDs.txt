@@ -1,0 +1,35 @@
+7|Steam Client|Empty
+8|winui2|Empty
+753|Steam|Good
+754|Steam Economy|Forbidden
+755|Steam Achievements|Empty
+756|Steam Big Picture|Empty
+760|Steam Screenshots|Forbidden
+761|Steam Cloud - Videos|Forbidden
+764|Steam Cloud - User Logs|Empty
+767|Steam Artwork|Forbidden
+1007|Steamworks SDK Redist|Empty
+6700|SteamTestApp6700|Forbidden
+41017|Steam Pre-order DLC|Empty
+202351|Beta Access to the New Steam Community|Forbidden
+202352|Steam Trading Card Beta Access|Forbidden
+218800|Steam Software Beta Access|Empty
+221410|Steam for Linux|Good
+223300|Steam Hardware|Good
+228980|Steamworks Common Redistributables|Forbidden
+241100|Steam Controller Configs|Empty
+245070|Steam Summer Getaway|Empty
+250820|SteamVR|Good
+258280|Steam Music|Forbidden
+323910|SteamVR Performance Test|Empty
+353370|Steam Controller|Good
+353380|Steam Link|Good
+358720|SteamVR Developer Hardware|Good
+413080|Steam Controller Configs - Desktop|Empty
+413090|Steam Controller Configs - Big Picture|Empty
+413100|Steam Controller Configs - Video Player|Empty
+424690|Steam Controller Configs - Streaming Client|Empty
+443510|Steam Controller Configs - Steam Button Chord|Empty
+596420|Steam Audio|Good
+613220|Steam 360 Video Player|Good
+639900|Steam Summer 2017|Empty
