@@ -3,7 +3,7 @@
 import time
 from datetime import datetime, timezone, timedelta
 from urllib.request import urlopen
-import urllib.error
+from urllib.error import HTTPError
 import json
 import sqlite3
 import xml.dom.minidom #Maybe replace this one...
@@ -59,6 +59,13 @@ def populateGames(gamedict):
 		c = db.cursor()
 		for appid, name in gamedict.items():
 			c.execute('INSERT OR IGNORE INTO Games VALUES (?, ?, 1)', (appid, name))
+
+def seedVidiosDB():
+	newsids = getAppIDsFromVanity('vidios')
+	newsids.update(getSteamNewsAppIDs())
+	populateGames(newsids)
+
+## Storage/caching related
 			
 def getGamesToFetch():
 	with sqlite3.connect(DBPATH) as db:
@@ -122,11 +129,72 @@ def getSteamNewsAppIDs():
 def getNewsForAppID(appid):
 	url = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?format=json&maxlength=0&count=5&appid={}'.format(appid)
 	try:
-		jsonstr = urlopen(url).read().decode('utf-8')
-		return json.loads(jsonstr)
-	except urllib.error.HTTPError as e:
+		response = urlopen(url)
+		# Get value of 'expires' header as a datetime obj
+		exdt = getExpiresDTFromResponse(response)
+		# Parse the JSON
+		news = json.loads(response.read().decode('utf-8'))
+		# Add the expire time to the group as a plain unix time
+		news['expires'] = int(exdt.timestamp())
+		# Decorate each news item and the group with its "true" appid
+		for ned in news['appnews']['newsitems']:
+			ned['realappid'] = appid
+		
+		return news
+	except HTTPError as e:
 		return {'error': '{} {}'.format(e.code, e.reason)}
 	
+def isNewsCached(appid):
+	with sqlite3.connect(DBPATH) as db:
+		c = db.cursor()
+		#c.execute('''CREATE TABLE ExpireTimes (appid INTEGER PRIMARY KEY, unixseconds INTEGER NOT NULL DEFAULT 0)''')
+		c.execute('SELECT unixseconds FROM ExpireTimes WHERE appid = ?', (appid,))
+		exptime = c.fetchone()
+		if exptime is None:
+			return False
+		else:
+			return exptime[0] < time.time()
+	
+# Is this news item more than 30 days old?
+def isNewsOld(ned):
+	newsdt = datetime.fromtimestamp(ned['date'], timezone.utc)
+	thirtyago = datetime.now(timezone.utc) - timedelta(days=30)
+	return newsdt < thirtyago
+
+# Given a single news dict from getNewsForAppID, save all "recent" news items to the DB
+def saveRecentNews(news):
+	with sqlite3.connect(DBPATH) as db:
+		c = db.cursor()
+		#c.execute('''CREATE TABLE ExpireTimes (appid INTEGER PRIMARY KEY, unixseconds INTEGER NOT NULL DEFAULT 0)''')
+		c.execute('INSERT OR REPLACE INTO ExpireTime VALUES (?, ?)', (news['appid'], news['expires']))
+		db.commit()
+		
+	for ned in news['appnews']['newsitems']:
+		if not isNewsOld(ned):
+			insertNewsItem(ned)
+
+# Given a dict of appids to names, store all "recent" items, respecting the cache
+def getAllRecentNews(newsids):
+	cachehits = 0
+	newhits = 0
+	fails = 0
+	for id, name in newsids.items():
+		if isNewsCached(id):
+			cachehits += 1
+		else:
+			print('Get {}: {}... '.format(id, name), end=None)
+			news = getNewsForAppID(id)
+			if 'appnews' in news: #success
+				saveRecentNews(news)
+				newhits += 1
+				print('OK!')
+				time.sleep(0.25)
+			else:
+				fails += 1
+				print('Error: {}'.format(news['error']))
+				time.sleep(1)
+	
+	print('Run complete. {} cached, {} fetched, {} failed'.format(cachehits, newhits, fails))
 	
 #TODO
 # Generate RSS, see:
@@ -138,43 +206,6 @@ def getNewsForAppID(appid):
 # https://bendodson.com/weblog/2016/05/17/fetching-rss-feeds-for-steam-game-updates/
 # http://www.getoffmalawn.com/blog/rss-feeds-for-steam-games
 
-def seedVidiosDB():
-	newsids = getAppIDsFromVanity('vidios')
-	newsids.update(getSteamNewsAppIDs())
-	populateGames(newsids)
-
 if __name__ == '__main__':
 	newsids = getGamesToFetch()
-	
-	good = []
-	empty = []
-	block = []
-	
-	for id, name in newsids.items():
-		print('{} ({})'.format(name, id))
-		news = getNewsForAppID(id)
-		if 'appnews' in news: #success
-			for ned in news['appnews']['newsitems']:
-				ned['realappid'] = id
-				insertNewsItem(ned)
-				
-			count = news['appnews']['count']
-			if count == 0:
-				print('OK, but empty')
-				empty.append(id)
-			else:
-				print('OK, count = {}'.format(count))
-				good.append(id)
-			
-			time.sleep(0.5)
-		else:
-			print(news)
-			block.append(id)
-			time.sleep(3)
-
-	print('Good:')
-	print('\n'.join(good))
-	print('Empty:')
-	print('\n'.join(empty))
-	print('Blocked:')
-	print('\n'.join(block))
+	getAllRecentNews(newsids)	
