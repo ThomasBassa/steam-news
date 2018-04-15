@@ -45,8 +45,7 @@ def initDB():
 		date INTEGER,
 		feedname TEXT,
 		feed_type INTEGER,
-		appid INTEGER,
-		realappid INTEGER
+		appid INTEGER
 		)''')
 	
 	db.commit()
@@ -57,7 +56,7 @@ def insertNewsItem(ned):
 	db.row_factory = sqlite3.Row
 	c = db.cursor()
 	try:
-		c.execute('''INSERT OR ABORT INTO NewsItems VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+		c.execute('INSERT OR ABORT INTO NewsItems VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 			(ned['gid'],
 			ned['title'],
 			ned['url'],
@@ -68,8 +67,7 @@ def insertNewsItem(ned):
 			ned['date'],
 			ned['feedname'],
 			ned['feed_type'],
-			ned['appid'],
-			ned['realappid'])
+			ned['appid'])
 		)
 		db.commit()
 	except sqlite3.IntegrityError:
@@ -171,7 +169,7 @@ if __name__ == '__main__':
 		news = getNewsForAppID(id)
 		if 'appnews' in news: #success
 			for ned in news['appnews']['newsitems']:
-				ned['realappid'] = id
+				#ned['realappid'] = id
 				insertNewsItem(ned)
 				
 			count = news['appnews']['count']
