@@ -23,7 +23,7 @@ def genRSSFeed(rssitems):
 		link = 'http://store.steampowered.com/news/?feed=mygames',
 		description = 'Brilliance',
 		pubDate = pdate,
-		lastBuildDate = bdate
+		lastBuildDate = bdate,
 		items = rssitems
 	) # TODO should ttl get a value?
 	return feed
