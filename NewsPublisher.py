@@ -4,6 +4,8 @@ import PyRSS2Gen
 from datetime import datetime, timezone
 import sqlite3
 
+from SteamNews import DBPATH
+
 #TODO
 # Generate RSS, see:
 # https://cyber.harvard.edu/rss/rss.html
@@ -15,15 +17,38 @@ import sqlite3
 # this seems to be connected to the use of psuedo bbcode
 #see https://steamcommunity.com/comment/Recommendation/formattinghelp
 
+def getNewsRows():
+	with sqlite3.connect(DBPATH) as db:
+		db.row_factory = sqlite3.Row
+		c = db.cursor()
+		#TODO get rid of WHERE when bbcode conv done
+		c.execute('SELECT * FROM NewsItems WHERE feed_type = 0 ORDER BY date DESC') #TODO LIMIT #?
+		return c.fetchall()
+
+def getGameSourceNamesForItem(gid):
+	with sqlite3.connect(DBPATH) as db:
+		c = db.cursor()
+		c.execute('SELECT name FROM NewsSources NATURAL JOIN Games WHERE gid = ? ORDER BY appid', (gid,))
+		# fetchall gives a bunch of tuples, so we have to unpack them with the for loop...
+		return ', '.join(x[0] for x in c.fetchall())
+
+def prependGameSources(gid, content):
+	names = getGameSourceNamesForItem(gid)
+	if names != '':
+		sources = '<p><i>Via: {}</i></p>\n'.format(names)
+	else:
+		sources = '<p><i>No game sources found?</i></p>\n'
+	return sources + content
+
 def genRSSFeed(rssitems):
 	pdate = datetime.now(timezone.utc) #TODO may want to vary with update freq? 
-	bdate = rssitems[0].pubDate #TODO might be last item instead
+	lbdate = rssitems[0].pubDate #TODO might be last item instead
 	feed = PyRSS2Gen.RSS2(
-		title = 'Test Feed',
+		title = 'Steam Game News',
 		link = 'http://store.steampowered.com/news/?feed=mygames',
-		description = 'Brilliance',
+		description = 'All of your Steam games\' news, combined!',
 		pubDate = pdate,
-		lastBuildDate = bdate,
+		lastBuildDate = lbdate,
 		items = rssitems
 	) # TODO should ttl get a value?
 	return feed
@@ -33,6 +58,9 @@ def rowToRSSItem(row):
 		content = convertBBCodeToHTML(row['contents'])
 	else:
 		content = row['contents']
+	
+	content = prependGameSources(row['gid'], content)
+	
 	item = PyRSS2Gen.RSSItem(
 		title = row['title'],
 		link = row['url'],
@@ -60,7 +88,7 @@ def convertBBCodeToHTML(text):
 # feed_type INTEGER,
 # appid INTEGER
 
-	
-
 if __name__ == '__main__':
-	pass
+	rssitems = list(map(rowToRSSItem, getNewsRows()))
+	feed = genRSSFeed(rssitems)
+	feed.write_xml(open('MySteamNewsFeed.xml', 'w'), 'utf-8')
