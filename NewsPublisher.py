@@ -28,13 +28,13 @@ def getGameSourceNamesForItem(gid):
 		# fetchall gives a bunch of tuples, so we have to unpack them with a for loop...
 		return ', '.join(x[0] for x in c.fetchall())
 
-def prependSources(gid, label, content):
+def getSources(gid, label):
 	names = getGameSourceNamesForItem(gid)
 	if names == '':
 		names = 'Unknown?'
 
 	sources = '<p><i>Via <b>{}</b> for {}</i></p>\n'.format(label, names)
-	return sources + content
+	return sources
 
 def genRSSFeed(rssitems):
 	pdate = datetime.now(timezone.utc) #TODO may want to vary with update freq?
@@ -55,12 +55,12 @@ def rowToRSSItem(row):
 	else:
 		content = row['contents']
 
-	content = prependSources(row['gid'], row['feedlabel'], content)
+	sources = getSources(row['gid'], row['feedlabel'])
 
 	item = PyRSS2Gen.RSSItem(
 		title = row['title'],
 		link = row['url'],
-		description = content,
+		description = sources + content,
 		author = row['author'],
 		guid = row['gid'],
 		pubDate = datetime.fromtimestamp(row['date'], timezone.utc)
