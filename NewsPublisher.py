@@ -106,7 +106,7 @@ def convertBBCodeToHTML(text):
 		bb.add_simple_formatter(tag, '<{0}>%(value)s</{0}>'.format(tag))
 		
 	bb.add_simple_formatter('h1', '<h2>%(value)s</h2>', strip=True, swallow_trailing_newline=True) #Using an actual H1 is a bit obnoxious...
-	bb.add_simple_formatter('img', '<img src="%(value)s">', strip=True, replace_links=False)
+	bb.add_simple_formatter('img', '<img style="display: inline-block; max-width: 100%;" src="%(value)s"></img>', strip=True, replace_links=False)
 
 	# The extra settings here are roughly based on the default formatters seen in the bbcode module source
 	bb.add_simple_formatter('noparse', '%(value)s', render_embedded=False, replace_cosmetic=False) #see 'code'
