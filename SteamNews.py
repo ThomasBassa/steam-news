@@ -1,5 +1,9 @@
 #!/usr/bin/python3
 
+# Inspired by the likes of
+# https://bendodson.com/weblog/2016/05/17/fetching-rss-feeds-for-steam-game-updates/
+# http://www.getoffmalawn.com/blog/rss-feeds-for-steam-games
+
 import time
 from datetime import datetime, timezone, timedelta
 from urllib.request import urlopen
@@ -27,15 +31,11 @@ def parseExpiresAsDT(exp):
 	return t.replace(tzinfo=timezone.utc)
 
 ## Initialization related
-	
+
 def initDB():
 	with sqlite3.connect(DBPATH) as db:
 		c = db.cursor()
-		
-		#TODO odd note: feed_type is 1 for steam community announcements (feedname == 'steam_community_announcements') and 0 otherwise
-		# this seems to be connected to the use of psuedo bbcode
-		#see https://steamcommunity.com/comment/Recommendation/formattinghelp
-		
+
 		c.execute('''CREATE TABLE Games (appid INTEGER PRIMARY KEY, name TEXT NOT NULL, shouldFetch INTEGER NOT NULL DEFAULT 1)''')
 		c.execute('''CREATE TABLE ExpireTimes (appid INTEGER PRIMARY KEY, unixseconds INTEGER NOT NULL DEFAULT 0)''')
 		c.execute('''CREATE TABLE NewsItems (
@@ -66,7 +66,7 @@ def seedVidiosDB():
 	populateGames(newsids)
 
 ## Storage/caching related
-			
+
 def getGamesToFetch():
 	with sqlite3.connect(DBPATH) as db:
 		c = db.cursor()
@@ -91,9 +91,10 @@ def insertNewsItem(ned):
 		)
 		c.execute('INSERT OR IGNORE INTO NewsSources VALUES (?, ?)',
 			(ned['gid'], ned['realappid']))
-		
+
 		db.commit()
 
+## Seeders
 
 # given vanity url, produce a dict of appids to names of games owned (appids are strings)
 # parses unofficial XML API of a Steam user's game list
@@ -125,6 +126,12 @@ def getSteamNewsAppIDs():
 		('613220', 'Steam 360 Video Player')
 	])
 
+## News Processing
+
+# Why are there so many variables named ned?
+# I shorthanded "news element dict" to distinguish it as a single item
+# vs. 'news' which is typically used for the entire JSON payload Steam gives us
+
 # Get news for the given appid as a dict
 def getNewsForAppID(appid):
 	url = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?format=json&maxlength=0&count=5&appid={}'.format(appid)
@@ -139,22 +146,21 @@ def getNewsForAppID(appid):
 		# Decorate each news item and the group with its "true" appid
 		for ned in news['appnews']['newsitems']:
 			ned['realappid'] = appid
-		
+
 		return news
 	except HTTPError as e:
 		return {'error': '{} {}'.format(e.code, e.reason)}
-	
+
 def isNewsCached(appid):
 	with sqlite3.connect(DBPATH) as db:
 		c = db.cursor()
-		#c.execute('''CREATE TABLE ExpireTimes (appid INTEGER PRIMARY KEY, unixseconds INTEGER NOT NULL DEFAULT 0)''')
 		c.execute('SELECT unixseconds FROM ExpireTimes WHERE appid = ?', (appid,))
 		exptime = c.fetchone()
 		if exptime is None:
 			return False
 		else:
 			return time.time() < exptime[0]
-	
+
 # Is this news item more than 30 days old?
 def isNewsOld(ned):
 	newsdt = datetime.fromtimestamp(ned['date'], timezone.utc)
@@ -165,10 +171,9 @@ def isNewsOld(ned):
 def saveRecentNews(news):
 	with sqlite3.connect(DBPATH) as db:
 		c = db.cursor()
-		#c.execute('''CREATE TABLE ExpireTimes (appid INTEGER PRIMARY KEY, unixseconds INTEGER NOT NULL DEFAULT 0)''')
 		c.execute('INSERT OR REPLACE INTO ExpireTimes VALUES (?, ?)', (news['appnews']['appid'], news['expires']))
 		db.commit()
-		
+
 	for ned in news['appnews']['newsitems']:
 		if not isNewsOld(ned):
 			insertNewsItem(ned)
@@ -193,19 +198,10 @@ def getAllRecentNews(newsids):
 				fails += 1
 				print('Error: {}'.format(news['error']))
 				time.sleep(1)
-	
-	print('Run complete. {} cached, {} fetched, {} failed'.format(cachehits, newhits, fails))
-	
-#TODO
-# Generate RSS, see:
-# https://stackoverflow.com/questions/17229544/how-to-dynamically-generate-xml-file-for-rss-feed#17254864
-# https://cyber.harvard.edu/rss/rss.html
-# https://docs.python.org/3.5/library/datetime.html
-# https://pypi.python.org/pypi/PyRSS2Gen
 
-# https://bendodson.com/weblog/2016/05/17/fetching-rss-feeds-for-steam-game-updates/
-# http://www.getoffmalawn.com/blog/rss-feeds-for-steam-games
+	print('Run complete. {} cached, {} fetched, {} failed'.format(cachehits, newhits, fails))
+
 
 if __name__ == '__main__':
 	newsids = getGamesToFetch()
-	getAllRecentNews(newsids)	
+	getAllRecentNews(newsids)
