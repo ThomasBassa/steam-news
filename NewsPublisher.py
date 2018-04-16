@@ -109,7 +109,7 @@ def convertBBCodeToHTML(text):
 	bb.add_simple_formatter('olist', '<ol>%(value)s</ol>', transform_newlines=False, strip=True, swallow_trailing_newline=True) #see 'list'
 	bb.add_simple_formatter('spoiler', '<span style="color: #000000;background-color: #000000;padding: 0px 8px;">%(value)s</span>') #see 's' & above css
 
-	return bb.render_html(text)
+	return bb.format(text)
 
 
 if __name__ == '__main__':
