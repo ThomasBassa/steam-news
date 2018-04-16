@@ -74,7 +74,8 @@ def rowToRSSItem(row):
 
 # Builtins: b, i, u, s, hr, sub, sup, list/*, quote (no author), code, center, color, url
 # Steam: h1, b, u, i, strike, spoiler, noparse, url, list/*, olist/*, quote=author, code, table[tr[th, td]]
-# Adding: h1, h2, strike, spoiler, noparse, olist (* already covered), table, tr, th, td
+# More from Steam not in above url: img
+# Adding: h1, strike, spoiler, noparse, olist (* already covered), table, tr, th, td
 # Ignoring special quote
 
 #Spoiler CSS
@@ -101,8 +102,11 @@ span.bb_spoiler:hover > span {
 def convertBBCodeToHTML(text):
 	bb = bbcode.Parser()
 
-	for tag in ('h1', 'h2', 'strike', 'table', 'tr', 'th', 'td'):
+	for tag in ('strike', 'table', 'tr', 'th', 'td'):
 		bb.add_simple_formatter(tag, '<{0}>%(value)s</{0}>'.format(tag))
+		
+	bb.add_simple_formatter('h1', '<h2>%(value)s</h2>', strip=True, swallow_trailing_newline=True) #Using an actual H1 is a bit obnoxious...
+	bb.add_simple_formatter('img', '<img src="%(value)s">', strip=True)
 
 	# The extra settings here are roughly based on the default formatters seen in the bbcode module source
 	bb.add_simple_formatter('noparse', '%(value)s', render_embedded=False, replace_cosmetic=False) #see 'code'
