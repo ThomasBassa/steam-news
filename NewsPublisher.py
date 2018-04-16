@@ -29,15 +29,15 @@ def getGameSourceNamesForItem(gid):
 	with sqlite3.connect(DBPATH) as db:
 		c = db.cursor()
 		c.execute('SELECT name FROM NewsSources NATURAL JOIN Games WHERE gid = ? ORDER BY appid', (gid,))
-		# fetchall gives a bunch of tuples, so we have to unpack them with the for loop...
+		# fetchall gives a bunch of tuples, so we have to unpack them with a for loop...
 		return ', '.join(x[0] for x in c.fetchall())
 
-def prependGameSources(gid, content):
+def prependSources(gid, label, content):
 	names = getGameSourceNamesForItem(gid)
-	if names != '':
-		sources = '<p><i>Via: {}</i></p>\n'.format(names)
-	else:
-		sources = '<p><i>No game sources found?</i></p>\n'
+	if names == '':
+		names = 'Unknown?'
+	
+	sources = '<p><i>Via <b>{}</b> for {}</i></p>\n'.format(label, names)
 	return sources + content
 
 def genRSSFeed(rssitems):
@@ -59,7 +59,7 @@ def rowToRSSItem(row):
 	else:
 		content = row['contents']
 	
-	content = prependGameSources(row['gid'], content)
+	content = prependSources(row['gid'], row['feedlabel'], content)
 	
 	item = PyRSS2Gen.RSSItem(
 		title = row['title'],
