@@ -1,28 +1,24 @@
 #!/usr/bin/python3
 
 import PyRSS2Gen
+import bbcode
 from datetime import datetime, timezone
 import sqlite3
 
 from SteamNews import DBPATH
 
-#TODO
 # Generate RSS, see:
 # https://cyber.harvard.edu/rss/rss.html
 # https://docs.python.org/3.5/library/datetime.html
 # https://pypi.python.org/pypi/PyRSS2Gen
 # http://dalkescientific.com/Python/PyRSS2Gen.html
 
-#TODO odd note: feed_type is 1 for steam community announcements (feedname == 'steam_community_announcements') and 0 otherwise
-# this seems to be connected to the use of psuedo bbcode
-#see https://steamcommunity.com/comment/Recommendation/formattinghelp
-
 def getNewsRows():
 	with sqlite3.connect(DBPATH) as db:
 		db.row_factory = sqlite3.Row
 		c = db.cursor()
-		#TODO get rid of WHERE when bbcode conv done
-		c.execute('SELECT * FROM NewsItems WHERE feed_type = 0 ORDER BY date DESC') #TODO LIMIT #?
+		#TODO get rid of WHERE when bbcode conv tests are successful
+		c.execute('SELECT * FROM NewsItems WHERE feed_type = 1 ORDER BY date DESC') #TODO LIMIT #?
 		return c.fetchall()
 
 def getGameSourceNamesForItem(gid):
@@ -36,12 +32,12 @@ def prependSources(gid, label, content):
 	names = getGameSourceNamesForItem(gid)
 	if names == '':
 		names = 'Unknown?'
-	
+
 	sources = '<p><i>Via <b>{}</b> for {}</i></p>\n'.format(label, names)
 	return sources + content
 
 def genRSSFeed(rssitems):
-	pdate = datetime.now(timezone.utc) #TODO may want to vary with update freq? 
+	pdate = datetime.now(timezone.utc) #TODO may want to vary with update freq?
 	lbdate = rssitems[0].pubDate #TODO might be last item instead
 	feed = PyRSS2Gen.RSS2(
 		title = 'Steam Game News',
@@ -58,9 +54,9 @@ def rowToRSSItem(row):
 		content = convertBBCodeToHTML(row['contents'])
 	else:
 		content = row['contents']
-	
+
 	content = prependSources(row['gid'], row['feedlabel'], content)
-	
+
 	item = PyRSS2Gen.RSSItem(
 		title = row['title'],
 		link = row['url'],
@@ -69,24 +65,52 @@ def rowToRSSItem(row):
 		guid = row['gid'],
 		pubDate = datetime.fromtimestamp(row['date'], timezone.utc)
 	) #omitted: categories, comments, enclosure, source
-	#TODO account for appids/names somewhere
 	return item
 
-#TODO!
-def convertBBCodeToHTML(text):
-	return '<p>TODO: BBCode Conversion!</p>{}'.format(text)
+# RE: BBCode http://bbcode.readthedocs.org/
+#TODO odd note: feed_type is 1 for steam community announcements (feedname == 'steam_community_announcements') and 0 otherwise
+# this seems to be connected to the use of psuedo bbcode
+#see https://steamcommunity.com/comment/Recommendation/formattinghelp
 
-# gid TEXT NOT NULL PRIMARY KEY,
-# title TEXT,
-# url TEXT,
-# is_external_url INTEGER,
-# author TEXT,
-# contents TEXT,
-# feedlabel TEXT,
-# date INTEGER,
-# feedname TEXT,
-# feed_type INTEGER,
-# appid INTEGER
+# Builtins: b, i, u, s, hr, sub, sup, list/*, quote (no author), code, center, color, url
+# Steam: h1, b, u, i, strike, spoiler, noparse, url, list/*, olist/*, quote=author, code, table[tr[th, td]]
+# Adding: h1, h2, strike, spoiler, noparse, olist (* already covered), table, tr, th, td
+# Ignoring special quote
+
+#Spoiler CSS
+'''
+span.bb_spoiler {
+	color: #000000;
+	background-color: #000000;
+
+	padding: 0px 8px;
+}
+
+span.bb_spoiler:hover {
+	color: #ffffff;
+}
+
+span.bb_spoiler > span {
+	visibility: hidden;
+}
+
+span.bb_spoiler:hover > span {
+	visibility: visible;
+}'''
+
+def convertBBCodeToHTML(text):
+	bb = bbcode.Parser()
+
+	for tag in ('h1', 'h2', 'strike', 'table', 'tr', 'th', 'td'):
+		bb.add_simple_formatter(tag, '<{0}>%(value)s</{0}>'.format(tag))
+
+	# The extra settings here are roughly based on the default formatters seen in the bbcode module source
+	bb.add_simple_formatter('noparse', '%(value)s', render_embedded=False, replace_cosmetic=False) #see 'code'
+	bb.add_simple_formatter('olist', '<ol>%(value)s</ol>', transform_newlines=False, strip=True, swallow_trailing_newline=True) #see 'list'
+	bb.add_simple_formatter('spoiler', '<span style="color: #000000;background-color: #000000;padding: 0px 8px;">%(value)s</span>') #see 's' & above css
+
+	return bb.render_html(text)
+
 
 if __name__ == '__main__':
 	rssitems = list(map(rowToRSSItem, getNewsRows()))
