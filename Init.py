@@ -75,9 +75,12 @@ if __name__ == '__main__':
 	import sys
 	if not os.path.isfile(DBPATH):
 		initDB()
-	#else the DB already exists and we don't need to make tables
+		print("Created database " + DBPATH)
+	else:
+		print("Database already exists.")
 
 	if len(sys.argv) >= 2:
 		seedDatabase(sys.argv[1])
+		print('Database seeded with games from ' + sys.argv[1])
 	else:
 		print("Run this script with a Steam ID or vanity URL as an argument to add its games to the list to fetch")
