@@ -17,8 +17,7 @@ def getNewsRows():
 	with sqlite3.connect(DBPATH) as db:
 		db.row_factory = sqlite3.Row
 		c = db.cursor()
-		#TODO get rid of WHERE when bbcode conv tests are successful
-		c.execute('SELECT * FROM NewsItems WHERE feed_type = 1 ORDER BY date DESC') #TODO LIMIT #?
+		c.execute('SELECT * FROM NewsItems ORDER BY date DESC') #TODO LIMIT #?
 		return c.fetchall()
 
 def getGameSourceNamesForItem(gid):
