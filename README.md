@@ -14,17 +14,32 @@ A SQLite database is used to store the list of AppIDs to fetch news for, as well
 a cache of all the news items retrieved.
 
 ## Usage
-`SteamNews.py` has utility methods to initialize a database (just a file, currently `SteamNews.db`)
-and fetch news from Steam's API. It respects the `Expires` headers sent by the API and only stores
-news items less than 30 days old.
+`Init.py` has utility methods to initialize a database (just a file, currently `SteamNews.db`)
+with tables to store a games list and the news caches.
 
-`NewsPublisher.py` converts the news items in the same database file to an RSS feed (an XML file)
-in the same directory.
+`SteamNews.py` fetches news from Steam's API. The AppIDs it fetches are based on what is stored
+by the init script. There is an extra column in the DB to turn off fetching per-game,
+but this currently needs to be done by hand with `sqlite3` or similar.
+Fetching respects the `Expires` headers sent by the API and only adds
+news items less than 30 days old.
+(There is currently no mechanism to clean out older entries automatically.)
+
+`NewsPublisher.py` converts all the news items in the same database file
+to an RSS feed (an XML file) in the same directory.
 
 `Publish.bash` is a sample Bash script to run NewsPublisher and commit the resulting feed to a Git repo
 (since I'm using GitHub Pages to publish my feed). The script runs with the assumption that
 `git push` won't require authorization (use an SSH key). It also assumes all of the directories
 in use for the project, which are running on a Raspberry Pi.
+
+## Dependencies
+This is a Python 3 project. The only external libraries in use are
+[PyRSS2Gen](http://dalkescientific.com/Python/PyRSS2Gen.html)
+and [bbcode](https://github.com/dcwatson/bbcode)
+
+```bash
+pip3 install -r requirements.txt
+```
 
 # Licence
 MIT, go nuts.
