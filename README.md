@@ -1,7 +1,8 @@
 # Steam News Feed Generator
 
 ## Motivations
-Steam provides a set of news feeds at http://store.steampowered.com/news/ .
+Steam provides a set of news feeds at http://store.steampowered.com/news/ for information
+about the games they sell.
 If you're signed in, they even customize the entires to only your games at
 http://store.steampowered.com/news/?feed=mygames
 but this is not accessible outside of Steam short of web scraping.
@@ -20,7 +21,10 @@ news items less than 30 days old.
 `NewsPublisher.py` converts the news items in the same database file to an RSS feed (an XML file)
 in the same directory.
 
-To come: A `bash` script to automatically push the script to GitHub Pages...
+`Publish.bash` is a sample Bash script to run NewsPublisher and commit the resulting feed to a Git repo
+(since I'm using GitHub Pages to publish my feed). The script runs with the assumption that
+`git push` won't require authorization (use an SSH key). It also assumes all of the directories
+in use for the project, which are running on a Raspberry Pi.
 
 # Licence
 MIT, go nuts.
