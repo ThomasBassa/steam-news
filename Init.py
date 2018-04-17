@@ -34,16 +34,21 @@ def populateGames(gamedict):
 		for appid, name in gamedict.items():
 			c.execute('INSERT OR IGNORE INTO Games VALUES (?, ?, 1)', (appid, name))
 
-def seedDatabase(vanity):
-	newsids = getAppIDsFromVanity(vanity)
+def seedDatabase(idOrVanity):
+	try:
+		id = int(idOrVanity)
+		url = 'https://steamcommunity.com/profiles/{}/games?xml=1'.format(id)
+	except ValueError: #it's probably a vanity str
+		url = 'https://steamcommunity.com/id/{}/games?xml=1'.format(idOrVanity)
+
+	newsids = getAppIDsFromURL(url)
 	#Also add the hardcoded ones...
 	newsids.update(getSteamNewsAppIDs())
 	populateGames(newsids)
 
-# given vanity url, produce a dict of appids to names of games owned (appids are strings)
+# given a steam profile url, produce a dict of appids to names of games owned (appids are strings)
 # parses unofficial XML API of a Steam user's game list
-def getAppIDsFromVanity(vanity):
-	url = 'https://steamcommunity.com/id/{}/games?xml=1'.format(vanity)
+def getAppIDsFromURL(url):
 	xmlstr = urlopen(url).read().decode('utf-8')
 	dom = xml.dom.minidom.parseString(xmlstr)
 	gameEls = dom.getElementsByTagName('game')
