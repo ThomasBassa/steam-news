@@ -1,5 +1,6 @@
 #!/bin/bash
 
+/usr/bin/python3 /home/pi/SteamNews/SteamNews.py
 /usr/bin/python3 /home/pi/SteamNews/NewsPublisher.py
 cp MySteamNewsFeed.xml /home/pi/NewsSite/SteamNews.xml
 cd /home/pi/NewsSite
