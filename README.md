@@ -27,8 +27,9 @@ news items less than 30 days old.
 `NewsPublisher.py` converts all the news items in the same database file
 to an RSS feed (an XML file) in the same directory.
 
-`Publish.bash` is a sample Bash script to run NewsPublisher and commit the resulting feed to a Git repo
-(since I'm using GitHub Pages to publish my feed). The script runs with the assumption that
+`updateAndPublish.sh` is a sample Bash script to run the last two scripts
+and commit the resulting feed to a Git repo (since I'm using GitHub Pages to publish my feed).
+The script runs with the assumption that
 `git push` won't require authorization (use an SSH key). It also assumes all of the directories
 in use for the project, which are running on a Raspberry Pi.
 
