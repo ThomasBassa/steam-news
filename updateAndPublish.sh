@@ -5,5 +5,5 @@
 cp MySteamNewsFeed.xml /home/pi/NewsSite/SteamNews.xml
 cd /home/pi/NewsSite
 git add SteamNews.xml
-git commit -m ":pager: Auto news update @ $(date)"
+git commit -m ":pager: Auto news update @ $(date -Idate)"
 git push origin gh-pages
