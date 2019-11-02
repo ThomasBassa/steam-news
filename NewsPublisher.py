@@ -104,8 +104,9 @@ def convertBBCodeToHTML(text):
 	for tag in ('strike', 'table', 'tr', 'th', 'td'):
 		bb.add_simple_formatter(tag, '<{0}>%(value)s</{0}>'.format(tag))
 		
-	bb.add_simple_formatter('h1', '<h2>%(value)s</h2>', strip=True, swallow_trailing_newline=True) #Using an actual H1 is a bit obnoxious...
-	bb.add_simple_formatter('img', '<img style="display: inline-block; max-width: 100%%;" src="%(value)s"></img>', strip=True, replace_links=False)
+	bb.add_simple_formatter('h1', '<h2>%(value)s</h2>', strip=True, swallow_trailing_newline=True) #Using an actual H1 is a bit 
+	#bb.add_simple_formatter('img', '<img style="display: inline-block; max-width: 100%%;" src="%(value)s"></img>', strip=True, replace_links=False)
+	bb.add_formatter('img', render_img, strip=True, replace_links=False)
 
 	# The extra settings here are roughly based on the default formatters seen in the bbcode module source
 	bb.add_simple_formatter('noparse', '%(value)s', render_embedded=False, replace_cosmetic=False) #see 'code'
@@ -113,6 +114,19 @@ def convertBBCodeToHTML(text):
 	bb.add_simple_formatter('spoiler', '<span style="color: #000000;background-color: #000000;padding: 0px 8px;">%(value)s</span>') #see 's' & above css
 
 	return bb.format(text)
+
+def render_img(tag_name, value, options, parent, context):
+        #Community img tags now frequently look like
+        #[img]{STEAM_CLAN_IMAGE}/27357479/d1048c635a5672f8efea79138bfd105b3cae552e.jpg[/img]
+        #which should translate to <img src="https://steamcdn-a.akamaihd.net/steamcommunity/public/images/clans/27357479/d1048c635a5672f8efea79138bfd105b3cae552e.jpg">
+        #e.g. {STEAM_CLAN_IMAGE} -> https://steamcdn-a.akamaihd.net/steamcommunity/public/images/clans
+        CLAN_IMG_MARK = '{STEAM_CLAN_IMAGE}'
+        CLAN_IMG_URL = 'https://steamcdn-a.akamaihd.net/steamcommunity/public/images/clans'
+        IMG = '<img style="display: inline-block; max-width: 100%;" src="{}"></img>'
+
+        src = value.replace(CLAN_IMG_MARK, CLAN_IMG_URL)
+        return IMG.format(src)
+
 
 
 if __name__ == '__main__':
