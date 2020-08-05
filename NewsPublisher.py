@@ -72,9 +72,9 @@ def rowToRSSItem(row):
 #see https://steamcommunity.com/comment/Recommendation/formattinghelp
 
 # Builtins: b, i, u, s, hr, sub, sup, list/*, quote (no author), code, center, color, url
-# Steam: h1, b, u, i, strike, spoiler, noparse, url, list/*, olist/*, quote=author, code, table[tr[th, td]]
+# Steam: h1, h2, h3, b, u, i, strike, spoiler, noparse, url, list/*, olist/*, quote=author, code, table[tr[th, td]], previewyoutube
 # More from Steam not in above url: img
-# Adding: h1, strike, spoiler, noparse, olist (* already covered), table, tr, th, td
+# Adding: h1, h2, h3, strike, spoiler, noparse, olist (* already covered), table, tr, th, td, previewyoutube
 # Ignoring special quote
 
 #Spoiler CSS
@@ -101,12 +101,13 @@ span.bb_spoiler:hover > span {
 def convertBBCodeToHTML(text):
 	bb = bbcode.Parser()
 
-	for tag in ('strike', 'table', 'tr', 'th', 'td'):
+	for tag in ('strike', 'table', 'tr', 'th', 'td', 'h1', 'h2', 'h3'):
 		bb.add_simple_formatter(tag, '<{0}>%(value)s</{0}>'.format(tag))
 		
-	bb.add_simple_formatter('h1', '<h2>%(value)s</h2>', strip=True, swallow_trailing_newline=True) #Using an actual H1 is a bit 
 	#bb.add_simple_formatter('img', '<img style="display: inline-block; max-width: 100%%;" src="%(value)s"></img>', strip=True, replace_links=False)
 	bb.add_formatter('img', render_img, strip=True, replace_links=False)
+
+	bb.add_formatter('previewyoutube', render_yt, strip=True, replace_links=True)
 
 	# The extra settings here are roughly based on the default formatters seen in the bbcode module source
 	bb.add_simple_formatter('noparse', '%(value)s', render_embedded=False, replace_cosmetic=False) #see 'code'
@@ -127,6 +128,20 @@ def render_img(tag_name, value, options, parent, context):
         src = value.replace(CLAN_IMG_MARK, CLAN_IMG_URL)
         return IMG.format(src)
 
+def render_yt(tag_name, value, options, parent, context):
+	#Youtube links in Steam posts look like
+	#[previewyoutube=gJEgjiorUPo;full][/previewyoutube]
+	#We *could* transform them into youtube embeds but
+	#I'd rather have the choice to click on them, so just make them youtu.be links
+	YT_TAG = '<a rel="nofollow" href="https://youtu.be/{0}">https://youtu.be/{0}</a>'
+	try:
+		#grab everything between the '=' (options dict) and the ';'
+		#TODO is there always a ;full component?
+		yt_id = options['previewyoutube'][:options['previewyoutube'].index(';')]
+		return YT_TAG.format(yt_id)
+	except (KeyError, ValueError):
+		#TODO uhh... look at https://dcwatson.github.io/bbcode/formatters/ again
+		return ''
 
 
 if __name__ == '__main__':
