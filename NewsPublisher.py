@@ -36,8 +36,8 @@ def getSources(gid, label):
 	return sources
 
 def genRSSFeed(rssitems):
-	pdate = datetime.now(timezone.utc) #TODO may want to vary with update freq?
-	lbdate = rssitems[0].pubDate #TODO might be last item instead
+	pdate = datetime.now(timezone.utc)
+	lbdate = rssitems[0].pubDate
 	feed = PyRSS2Gen.RSS2(
 		title = 'Steam Game News',
 		link = 'http://store.steampowered.com/news/?feed=mygames',
@@ -61,7 +61,7 @@ def rowToRSSItem(row):
 		link = row['url'],
 		description = sources + content,
 		author = row['author'],
-		guid = row['gid'],
+		guid = PyRSS2Gen.Guid(row['gid'], isPermaLink=False)
 		pubDate = datetime.fromtimestamp(row['date'], timezone.utc)
 	) #omitted: categories, comments, enclosure, source
 	return item
@@ -147,4 +147,5 @@ def render_yt(tag_name, value, options, parent, context):
 if __name__ == '__main__':
 	rssitems = list(map(rowToRSSItem, getNewsRows()))
 	feed = genRSSFeed(rssitems)
-	feed.write_xml(open('MySteamNewsFeed.xml', 'w'), 'utf-8')
+	with open('MySteamNewsFeed.xml', 'w') as f:
+		feed.write_xml(f, 'utf-8')
