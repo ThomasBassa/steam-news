@@ -28,10 +28,11 @@ news items less than 30 days old.
 to an RSS feed (an XML file) in the same directory.
 
 `updateAndPublish.sh` is a sample Bash script to run the last two scripts
-and commit the resulting feed to a Git repo (since I'm using GitHub Pages to publish my feed).
-The script runs with the assumption that
-`git push` won't require authorization (use an SSH key). It also assumes all of the directories
-in use for the project, which are running on a Raspberry Pi.
+and copy the result where it will be published.
+I run this on a Raspberry Pi, so there are some assumed directories there...
+
+I previously used GitHub Pages on this repo to publish the feed-- this is now out of date.
+I'll leave it up for historical reasons, but I don't intend to update it.
 
 ## Dependencies
 This is a Python 3 project. The only external libraries in use are
