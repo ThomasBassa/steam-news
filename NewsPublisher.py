@@ -67,7 +67,7 @@ def rowToRSSItem(row):
         link=row['url'],
         description=sources + content,
         author=row['author'],
-        guid=PyRSS2Gen.Guid(row['gid'], isPermaLink=False)
+        guid=PyRSS2Gen.Guid(row['gid'], isPermaLink=False),
         pubDate=datetime.fromtimestamp(row['date'], timezone.utc)
     )  # omitted: categories, comments, enclosure, source
     return item
