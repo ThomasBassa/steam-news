@@ -4,6 +4,7 @@ import PyRSS2Gen
 import bbcode
 from datetime import datetime, timezone
 import sqlite3
+import difflib
 
 from SteamNews import DBPATH
 
@@ -28,16 +29,7 @@ def getGameSourceNamesForItem(gid):
         c = db.cursor()
         c.execute('SELECT name FROM NewsSources NATURAL JOIN Games WHERE gid = ? ORDER BY appid', (gid,))
         # fetchall gives a bunch of tuples, so we have to unpack them with a for loop...
-        return ', '.join(x[0] for x in c.fetchall())
-
-
-def getSources(gid, label):
-    names = getGameSourceNamesForItem(gid)
-    if names == '':
-        names = 'Unknown?'
-
-    sources = '<p><i>Via <b>{}</b> for {}</i></p>\n'.format(label, names)
-    return sources
+        return list(x[0] for x in c.fetchall())
 
 
 def genRSSFeed(rssitems):
@@ -60,10 +52,25 @@ def rowToRSSItem(row):
     else:
         content = row['contents']
 
-    sources = getSources(row['gid'], row['feedlabel'])
+    #Add the title of the game to the article title,
+    #  but only if not present according to 'in' or difflib.get_close_matches.
+    #get_close_matches isn't great for longer titles given the split() but /shrug
+    #There are other libraries for fuzzy matching but difflib is built in...
+    games = getGameSourceNamesForItem(row['gid']) or ['Unknown?']
+    rsstitle = row['title']
+    if len(games) > 1:
+        rsstitle = '[Multiple] ' + rsstitle
+    elif (games[0] not in rsstitle and not
+            difflib.get_close_matches(games[0].lower(), rsstitle.lower().split(),
+                n=1, cutoff=0.8)):
+        rsstitle = '[{}] {}'.format(games[0], rsstitle)
+    #else game title is in article title, do nothing
+
+    sources = '<p><i>Via <b>{}</b> for {}</i></p>\n'.format(
+            row['feedlabel'], ', '.join(games))
 
     item = PyRSS2Gen.RSSItem(
-        title=row['title'],
+        title=rsstitle,
         link=row['url'],
         description=sources + content,
         author=row['author'],
@@ -73,7 +80,7 @@ def rowToRSSItem(row):
     return item
 
 # RE: BBCode http://bbcode.readthedocs.org/
-# TODO odd note: feed_type is 1 for steam community announcements (feedname == 'steam_community_announcements') and 0 otherwise
+# note: feed_type is 1 for steam community announcements (feedname == 'steam_community_announcements') and 0 otherwise
 # this seems to be connected to the use of psuedo bbcode
 # see https://steamcommunity.com/comment/Recommendation/formattinghelp
 
