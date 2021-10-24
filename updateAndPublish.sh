@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-/usr/bin/python3 /home/pi/SteamNews/SteamNews.py &> steam_fetch.log
-/usr/bin/python3 /home/pi/SteamNews/NewsPublisher.py &> steam_publish.log
+/usr/bin/python3.5 /home/pi/SteamNews/SteamNews.py &> steam_fetch.log
+/usr/bin/python3.5 /home/pi/SteamNews/NewsPublisher.py &> steam_publish.log
 cp MySteamNewsFeed.xml /mnt/dav/news/steam_news.xml
 
 #Old mechanism to push to GitHub Pages
