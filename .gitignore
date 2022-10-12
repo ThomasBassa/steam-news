@@ -1,5 +1,6 @@
 *.xml
 *.db
+*.log
 
 # Via https://github.com/github/gitignore/blob/master/Python.gitignore
 # Byte-compiled / optimized / DLL files
@@ -20,6 +21,7 @@ eggs/
 .eggs/
 lib/
 lib64/
+lib64
 parts/
 sdist/
 var/
@@ -28,6 +30,9 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+bin/
+pyvenv.cfg
+share/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
