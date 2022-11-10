@@ -4,17 +4,18 @@
 # https://bendodson.com/weblog/2016/05/17/fetching-rss-feeds-for-steam-game-updates/
 # http://www.getoffmalawn.com/blog/rss-feeds-for-steam-games
 
+import logging
 import time
 from datetime import datetime, timezone, timedelta
 from urllib.request import urlopen
 from urllib.error import HTTPError
 import json
-import sqlite3
 
-from Init import DBPATH
+from database import NewsDatabase
+
+logger = logging.getLogger(__name__)
 
 # Date/time manipulation
-
 
 def getExpiresDTFromResponse(response):
     exp = response.getheader('Expires')
@@ -31,45 +32,13 @@ def parseExpiresAsDT(exp):
     # So we're going to assume it's always GMT/UTC
     return t.replace(tzinfo=timezone.utc)
 
-# Storage/caching related
-
-
-def getGamesToFetch():
-    with sqlite3.connect(DBPATH) as db:
-        c = db.cursor()
-        c.execute('SELECT appid, name FROM Games WHERE shouldFetch != 0')
-        return dict(c.fetchall())
-
-
-def insertNewsItem(ned):
-    with sqlite3.connect(DBPATH) as db:
-        c = db.cursor()
-        c.execute('INSERT OR IGNORE INTO NewsItems VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                  (ned['gid'],
-                   ned['title'],
-                   ned['url'],
-                   ned['is_external_url'],
-                   ned['author'],
-                   ned['contents'],
-                   ned['feedlabel'],
-                   ned['date'],
-                   ned['feedname'],
-                   ned['feed_type'],
-                   ned['appid'])
-                  )
-        c.execute('INSERT OR IGNORE INTO NewsSources VALUES (?, ?)',
-                  (ned['gid'], ned['realappid']))
-
-        db.commit()
-
 # Why are there so many variables named ned?
 # I shorthanded "news element dict" to distinguish it as a single item
 # vs. 'news' which is typically used for the entire JSON payload Steam gives us
 
-# Get news for the given appid as a dict
-
 
 def getNewsForAppID(appid):
+    """Get news for the given appid as a dict"""
     url = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?format=json&maxlength=0&count=5&appid={}'.format(appid)
     try:
         response = urlopen(url)
@@ -88,65 +57,53 @@ def getNewsForAppID(appid):
         return {'error': '{} {}'.format(e.code, e.reason)}
 
 
-def isNewsCached(appid):
-    with sqlite3.connect(DBPATH) as db:
-        c = db.cursor()
-        c.execute('SELECT unixseconds FROM ExpireTimes WHERE appid = ?', (appid,))
-        exptime = c.fetchone()
-        if exptime is None:
-            return False
-        else:
-            return time.time() < exptime[0]
-
-# Is this news item more than 30 days old?
-
-
 def isNewsOld(ned):
+    """Is this news item more than 30 days old?"""
     newsdt = datetime.fromtimestamp(ned['date'], timezone.utc)
     thirtyago = datetime.now(timezone.utc) - timedelta(days=30)
     return newsdt < thirtyago
 
-# Given a single news dict from getNewsForAppID, save all "recent" news items to the DB
 
-
-def saveRecentNews(news):
-    with sqlite3.connect(DBPATH) as db:
-        c = db.cursor()
-        c.execute('INSERT OR REPLACE INTO ExpireTimes VALUES (?, ?)',
-                  (news['appnews']['appid'], news['expires']))
-        db.commit()
+def saveRecentNews(news: dict, db: NewsDatabase):
+    """Given a single news dict from getNewsForAppID,
+    save all "recent" news items to the DB"""
+    db.update_expire_time(news['appnews']['appid'], news['expires'])
 
     for ned in news['appnews']['newsitems']:
         if not isNewsOld(ned):
-            insertNewsItem(ned)
-
-# Given a dict of appids to names, store all "recent" items, respecting the cache
+            db.insert_news_item(ned)
 
 
-def getAllRecentNews(newsids):
+def getAllRecentNews(newsids: dict, db: NewsDatabase):
+    """Given a dict of appids to names, store all "recent" items, respecting the cache"""
     cachehits = 0
     newhits = 0
     fails = 0
-    for id, name in newsids.items():
-        if isNewsCached(id):
+    for aid, name in newsids.items():
+        if db.is_news_cached(aid):
+            logger.info('Cache for %d: %s still valid!', aid, name)
             cachehits += 1
         else:
-            print('Get {}: {}... '.format(id, name), end=None)
-            news = getNewsForAppID(id)
-            if 'appnews' in news:  # success
-                saveRecentNews(news)
+            news = getNewsForAppID(aid)
+            if 'appnews' in news: # success
+                saveRecentNews(news, db)
                 newhits += 1
-                print('OK!')
+                logger.info('Fetched %d: %s OK!', aid, name)
                 time.sleep(0.25)
             else:
                 fails += 1
-                print('Error: {}'.format(news['error']))
+                logger.error('%d: %s fetch error: %s', aid, name, news['error'])
                 time.sleep(1)
 
-    print('Run complete. {} cached, {} fetched, {} failed'.format(
-        cachehits, newhits, fails))
+    logger.info('Run complete. %d cached, %d fetched, %d failed',
+            cachehits, newhits, fails)
 
 
 if __name__ == '__main__':
-    newsids = getGamesToFetch()
-    getAllRecentNews(newsids)
+    import sys
+    logging.basicConfig(stream=sys.stdout,
+            format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
+            level=logging.DEBUG)
+    with NewsDatabase() as db:
+        newsids = db.get_fetch_games()
+        getAllRecentNews(newsids, db)

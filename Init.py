@@ -1,100 +1,71 @@
 #!/usr/bin/python3
 
+import logging
 import sqlite3
 from urllib.request import urlopen
 import xml.dom.minidom  # Maybe replace this one...
 
-DBPATH = 'SteamNews.db'
+from database import NewsDatabase
+
+logger = logging.getLogger(__name__)
+
+# Hardcoded list of AppIDs that return news related to Steam as a whole (not games)
+# Mileage may vary. Use app_id_discovery.py to maybe find more of these...
+STEAM_APPIDS = {753: 'Steam',
+        221410: 'Steam for Linux',
+        223300: 'Steam Hardware',
+        250820: 'SteamVR',
+        353370: 'Steam Controller',
+        353380: 'Steam Link',
+        358720: 'SteamVR Developer Hardware',
+        596420: 'Steam Audio',
+        613220: 'Steam 360 Video Player'}
 
 
-def initDB():
-    with sqlite3.connect(DBPATH) as db:
-        c = db.cursor()
-
-        c.execute('''CREATE TABLE Games (appid INTEGER PRIMARY KEY, name TEXT NOT NULL, shouldFetch INTEGER NOT NULL DEFAULT 1)''')
-        c.execute('''CREATE TABLE ExpireTimes (appid INTEGER PRIMARY KEY, unixseconds INTEGER NOT NULL DEFAULT 0)''')
-        c.execute('''CREATE TABLE NewsItems (
-			gid TEXT NOT NULL PRIMARY KEY,
-			title TEXT,
-			url TEXT,
-			is_external_url INTEGER,
-			author TEXT,
-			contents TEXT,
-			feedlabel TEXT,
-			date INTEGER,
-			feedname TEXT,
-			feed_type INTEGER,
-			appid INTEGER
-			)''')
-        c.execute('''CREATE TABLE NewsSources (gid TEXT NOT NULL, appid INTEGER NOT NULL, PRIMARY KEY(gid, appid))''')
-        db.commit()
-
-
-def populateGames(gamedict):
-    with sqlite3.connect(DBPATH) as db:
-        c = db.cursor()
-        for appid, name in gamedict.items():
-            c.execute('INSERT OR IGNORE INTO Games VALUES (?, ?, 1)',
-                      (appid, name))
-
-
-def seedDatabase(idOrVanity):
+def seed_database(idOrVanity, db: NewsDatabase):
     try:
-        id = int(idOrVanity)
-        url = 'https://steamcommunity.com/profiles/{}/games?xml=1'.format(id)
+        sid = int(idOrVanity)
+        url = 'https://steamcommunity.com/profiles/{}/games?xml=1'.format(sid)
     except ValueError:  # it's probably a vanity str
         url = 'https://steamcommunity.com/id/{}/games?xml=1'.format(idOrVanity)
 
     newsids = getAppIDsFromURL(url)
-    # Also add the hardcoded ones...
-    newsids.update(getSteamNewsAppIDs())
-    populateGames(newsids)
-
-# given a steam profile url, produce a dict of appids to names of games owned (appids are strings)
-# parses unofficial XML API of a Steam user's game list
+    #Also add the hardcoded ones...
+    newsids.update(STEAM_APPIDS)
+    db.add_games(newsids)
 
 
 def getAppIDsFromURL(url):
+    """Given a steam profile url, produce a dict of
+    appids to names of games owned (appids are strings)
+    i.e. parses unofficial XML API of a Steam user's game list.
+    Note that the profile in question needs to be public for this to work!"""
+    logger.info('Parsing XML from %s...', url)
     xmlstr = urlopen(url).read().decode('utf-8')
     dom = xml.dom.minidom.parseString(xmlstr)
     gameEls = dom.getElementsByTagName('game')
 
-    gameTuples = []
+    games = {}
     for ge in gameEls:
-        appid = ge.getElementsByTagName('appID')[0].firstChild.data
+        appid = int(ge.getElementsByTagName('appID')[0].firstChild.data)
         name = ge.getElementsByTagName('name')[0].firstChild.data
-        gameTuples.append((appid, name))
+        games[appid] = name
 
-    return dict(gameTuples)
-
-# Hardcoded list of AppIDs that return news related to Steam as a whole (not games)
-# returns a dict of appids to names (appids are strings)
-
-
-def getSteamNewsAppIDs():
-    return dict([('753', 'Steam'),
-                 ('221410', 'Steam for Linux'),
-                 ('223300', 'Steam Hardware'),
-                 ('250820', 'SteamVR'),
-                 ('353370', 'Steam Controller'),
-                 ('353380', 'Steam Link'),
-                 ('358720', 'SteamVR Developer Hardware'),
-                 ('596420', 'Steam Audio'),
-                 ('613220', 'Steam 360 Video Player')
-                 ])
-
+    logger.info('Found %d games.', len(games))
+    return games
 
 if __name__ == '__main__':
     import os.path
     import sys
-    if not os.path.isfile(DBPATH):
-        initDB()
-        print("Created database " + DBPATH)
-    else:
-        print("Database already exists.")
+    logging.basicConfig(stream=sys.stdout,
+            format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
+            level=logging.DEBUG)
+    with NewsDatabase() as db:
+        if not os.path.isfile(db.path):
+            db.first_run()
 
-    if len(sys.argv) >= 2:
-        seedDatabase(sys.argv[1])
-        print('Database seeded with games from ' + sys.argv[1])
-    else:
-        print("Run this script with a Steam ID or vanity URL as an argument to add its games to the list to fetch")
+        if len(sys.argv) >= 2:
+            seed_database(sys.argv[1], db)
+            logger.info('Database seeded with games from ' + sys.argv[1])
+        else:
+            logger.info('Run this script with a Steam ID or vanity URL as an argument to add its games to the list to fetch')

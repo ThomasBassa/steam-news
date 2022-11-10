@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 
+import logging
+from datetime import datetime, timezone
+import difflib
+from functools import partial
+
 import PyRSS2Gen
 import bbcode
-from datetime import datetime, timezone
-import sqlite3
-import difflib
 
-from SteamNews import DBPATH
+from database import NewsDatabase
 
 # Generate RSS, see:
 # https://cyber.harvard.edu/rss/rss.html
@@ -14,23 +16,7 @@ from SteamNews import DBPATH
 # https://pypi.python.org/pypi/PyRSS2Gen
 # http://dalkescientific.com/Python/PyRSS2Gen.html
 
-
-def getNewsRows():
-    with sqlite3.connect(DBPATH) as db:
-        db.row_factory = sqlite3.Row
-        c = db.cursor()
-        # TODO LIMIT #?
-        c.execute('SELECT * FROM NewsItems ORDER BY date DESC')
-        return c.fetchall()
-
-
-def getGameSourceNamesForItem(gid):
-    with sqlite3.connect(DBPATH) as db:
-        c = db.cursor()
-        c.execute('SELECT name FROM NewsSources NATURAL JOIN Games WHERE gid = ? ORDER BY appid', (gid,))
-        # fetchall gives a bunch of tuples, so we have to unpack them with a for loop...
-        return list(x[0] for x in c.fetchall())
-
+logger = logging.getLogger(__name__)
 
 def genRSSFeed(rssitems):
     pdate = datetime.now(timezone.utc)
@@ -46,7 +32,7 @@ def genRSSFeed(rssitems):
     return feed
 
 
-def rowToRSSItem(row):
+def rowToRSSItem(row, db: NewsDatabase):
     if row['feed_type'] == 1:
         content = convertBBCodeToHTML(row['contents'])
     else:
@@ -56,7 +42,7 @@ def rowToRSSItem(row):
     #  but only if not present according to 'in' or difflib.get_close_matches.
     #get_close_matches isn't great for longer titles given the split() but /shrug
     #There are other libraries for fuzzy matching but difflib is built in...
-    games = getGameSourceNamesForItem(row['gid']) or ['Unknown?']
+    games = db.get_source_names_for_item(row['gid']) or ['Unknown?']
     rsstitle = row['title']
     if len(games) > 1:
         rsstitle = '[Multiple] ' + rsstitle
@@ -166,7 +152,13 @@ def render_yt(tag_name, value, options, parent, context):
 
 
 if __name__ == '__main__':
-    rssitems = list(map(rowToRSSItem, getNewsRows()))
-    feed = genRSSFeed(rssitems)
-    with open('MySteamNewsFeed.xml', 'w') as f:
-        feed.write_xml(f, 'utf-8')
+    import sys
+    logging.basicConfig(stream=sys.stdout,
+            format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
+            level=logging.DEBUG)
+    with NewsDatabase() as db:
+        row_func = partial(rowToRSSItem, db=db)
+        rssitems = list(map(row_func, db.get_news_rows()))
+        feed = genRSSFeed(rssitems)
+        with open('MySteamNewsFeed.xml', 'w') as f:
+            feed.write_xml(f, 'utf-8')
