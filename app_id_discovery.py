@@ -41,6 +41,8 @@ def capture_and_save():
 
 
 #TODO search...?
+# $ sqlite3 appids.db 'SELECT * FROM AppIDs WHERE name LIKE "%steam%" ORDER BY name' >ids_with_steam.log
+#just combed by hand from there in a text editor
 
 if __name__ == '__main__':
     capture_and_save()

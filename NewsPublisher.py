@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def genRSSFeed(rssitems):
     pdate = datetime.now(timezone.utc)
     lbdate = rssitems[0].pubDate
-    feed = PyRSS2Gen.RSS2(
+    return PyRSS2Gen.RSS2(
         title='Steam Game News',
         link='http://store.steampowered.com/news/?feed=mygames',
         description='All of your Steam games\' news, combined!',
@@ -29,7 +29,6 @@ def genRSSFeed(rssitems):
         lastBuildDate=lbdate,
         items=rssitems
     )  # TODO should ttl get a value?
-    return feed
 
 
 def rowToRSSItem(row, db: NewsDatabase):
@@ -150,6 +149,17 @@ def render_yt(tag_name, value, options, parent, context):
         # TODO uhh... look at https://dcwatson.github.io/bbcode/formatters/ again
         return ''
 
+def publish(db: NewsDatabase, output_path=None):
+    if not output_path:
+        output_path = 'steam_news.xml'
+    logger.info('Generating RSS feed...')
+    row_func = partial(rowToRSSItem, db=db)
+    rssitems = list(map(row_func, db.get_news_rows()))
+    feed = genRSSFeed(rssitems)
+    logger.info('Writing to %s...', output_path)
+    with open(output_path, 'w') as f:
+        feed.write_xml(f, 'utf-8')
+    logger.info('Published!')
 
 if __name__ == '__main__':
     import sys
@@ -157,8 +167,4 @@ if __name__ == '__main__':
             format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
             level=logging.DEBUG)
     with NewsDatabase() as db:
-        row_func = partial(rowToRSSItem, db=db)
-        rssitems = list(map(row_func, db.get_news_rows()))
-        feed = genRSSFeed(rssitems)
-        with open('MySteamNewsFeed.xml', 'w') as f:
-            feed.write_xml(f, 'utf-8')
+        publish(db)

@@ -3,6 +3,5 @@ set -e
 
 cd -- "$(dirname -- "${BASH_SOURCE[0]}" )"
 source bin/activate
-./SteamNews.py &> steam_fetch.log
-./NewsPublisher.py &> steam_publish.log
-cp MySteamNewsFeed.xml /mnt/dav/news/steam_news.xml
+./SteamNews.py --verbose --fetch --publish steam_news.xml &> log_steam_news.log
+cp steam_news.xml /mnt/dav/news/steam_news.xml

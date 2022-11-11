@@ -4,16 +4,65 @@
 # https://bendodson.com/weblog/2016/05/17/fetching-rss-feeds-for-steam-game-updates/
 # http://www.getoffmalawn.com/blog/rss-feeds-for-steam-games
 
-import logging
-import time
+import argparse
 from datetime import datetime, timezone, timedelta
+import json
+import logging
+import sys
+import time
 from urllib.request import urlopen
 from urllib.error import HTTPError
-import json
+import xml.dom.minidom  # Maybe replace this one...
 
 from database import NewsDatabase
+from NewsPublisher import publish
 
 logger = logging.getLogger(__name__)
+
+# Hardcoded list of AppIDs that return news related to Steam as a whole (not games)
+# Mileage may vary. Use app_id_discovery.py to maybe find more of these...
+STEAM_APPIDS = {753: 'Steam',
+        221410: 'Steam for Linux',
+        223300: 'Steam Hardware',
+        250820: 'SteamVR',
+        353370: 'Steam Controller',
+        353380: 'Steam Link',
+        358720: 'SteamVR Developer Hardware',
+        596420: 'Steam Audio',
+        613220: 'Steam 360 Video Player'}
+
+
+def seed_database(idOrVanity, db: NewsDatabase):
+    try:
+        sid = int(idOrVanity)
+        url = 'https://steamcommunity.com/profiles/{}/games?xml=1'.format(sid)
+    except ValueError:  # it's probably a vanity str
+        url = 'https://steamcommunity.com/id/{}/games?xml=1'.format(idOrVanity)
+
+    newsids = getAppIDsFromURL(url)
+    #Also add the hardcoded ones...
+    newsids.update(STEAM_APPIDS)
+    db.add_games(newsids)
+
+
+def getAppIDsFromURL(url):
+    """Given a steam profile url, produce a dict of
+    appids to names of games owned (appids are strings)
+    i.e. parses unofficial XML API of a Steam user's game list.
+    Note that the profile in question needs to be public for this to work!"""
+    logger.info('Parsing XML from %s...', url)
+    xmlstr = urlopen(url).read().decode('utf-8')
+    dom = xml.dom.minidom.parseString(xmlstr)
+    gameEls = dom.getElementsByTagName('game')
+
+    games = {}
+    for ge in gameEls:
+        appid = int(ge.getElementsByTagName('appID')[0].firstChild.data)
+        name = ge.getElementsByTagName('name')[0].firstChild.data
+        games[appid] = name
+
+    logger.info('Found %d games.', len(games))
+    return games
 
 # Date/time manipulation
 
@@ -36,10 +85,9 @@ def parseExpiresAsDT(exp):
 # I shorthanded "news element dict" to distinguish it as a single item
 # vs. 'news' which is typically used for the entire JSON payload Steam gives us
 
-
 def getNewsForAppID(appid):
     """Get news for the given appid as a dict"""
-    url = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?format=json&maxlength=0&count=5&appid={}'.format(appid)
+    url = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?format=json&maxlength=0&count=10&appid={}'.format(appid)
     try:
         response = urlopen(url)
         # Get value of 'expires' header as a datetime obj
@@ -99,11 +147,38 @@ def getAllRecentNews(newsids: dict, db: NewsDatabase):
             cachehits, newhits, fails)
 
 
-if __name__ == '__main__':
-    import sys
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--first-run', action='store_true')
+    parser.add_argument('-a', '--add-profile-games') # + steam ID/vanity url
+    parser.add_argument('-f', '--fetch', action='store_true')
+    parser.add_argument('-p', '--publish') # + path to XML output
+    parser.add_argument('-g', '--edit-games-like') # + partial name of game
+    parser.add_argument('-v', '--verbose', action='store_true')
+    #TODO maybe arg for DB path...?
+    args = parser.parse_args()
+
+    lvl = logging.INFO if not args.verbose else logging.DEBUG
     logging.basicConfig(stream=sys.stdout,
             format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
-            level=logging.DEBUG)
+            level=lvl)
+
     with NewsDatabase() as db:
-        newsids = db.get_fetch_games()
-        getAllRecentNews(newsids, db)
+        if args.first_run:
+            db.first_run()
+
+        if args.add_profile_games:
+            seed_database(args.add_profile_games, db)
+
+        if args.edit_games_like:
+            logging.error('Not yet implemented...')
+        else: #editing is mutually exclusive w/ fetch & publish
+            if args.fetch:
+                newsids = db.get_fetch_games()
+                getAllRecentNews(newsids, db)
+
+            if args.publish:
+                publish(db, args.publish)
+
+if __name__ == '__main__':
+    main()
