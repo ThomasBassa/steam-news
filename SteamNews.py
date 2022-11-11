@@ -8,6 +8,7 @@ import argparse
 from datetime import datetime, timezone, timedelta
 import json
 import logging
+import subprocess
 import sys
 import time
 from urllib.request import urlopen
@@ -146,6 +147,46 @@ def getAllRecentNews(newsids: dict, db: NewsDatabase):
     logger.info('Run complete. %d cached, %d fetched, %d failed',
             cachehits, newhits, fails)
 
+def edit_fetch_games(name, db: NewsDatabase):
+    logger.info('Editing games like "%s"', name)
+    games = db.get_games_like(name)
+    before_on = set()
+    before_off = set()
+    args = ['whiptail', '--title', 'Select games to fetch news for',
+            '--separate-output', '--checklist',
+            'Use arrow keys to move, Space to toggle, Tab to go to OK, ESC to cancel.',
+            '50', '100', '43', '--']
+    for game in games:
+        if game['shouldFetch']:
+            before_on.add(game['appid'])
+            status = 'on'
+        else:
+            before_off.add(game['appid'])
+            status = 'off'
+        args.append(str(game['appid']))
+        args.append(game['name'])
+        args.append(status)
+
+    proc = subprocess.run(args, stderr=subprocess.PIPE, text=True)
+    if proc.returncode != 0:
+        logger.info('Cancelled editing games.')
+        return
+    #Convert stderr output to set of int appids...
+    selected = frozenset(map(int, proc.stderr.strip().split('\n')))
+    logger.debug('Before on: %s\nBefore off: %s\nSelected (enable): %s',
+            before_on, before_off, selected)
+    #disable: ids in before_on that are not in selected
+    disabled = before_on - selected
+    #enable: ids in selected that are also in before_off
+    enabled = selected & before_off
+    logger.debug('Enabled %s\nDisabled: %s', enabled, disabled)
+
+    if disabled:
+        db.disable_fetching_ids(disabled)
+        logger.info('Disabled %d games.', len(disabled))
+    if enabled:
+        db.enable_fetching_ids(enabled)
+        logger.info('Enabled %d games.', len(enabled))
 
 def main():
     parser = argparse.ArgumentParser()
@@ -171,7 +212,7 @@ def main():
             seed_database(args.add_profile_games, db)
 
         if args.edit_games_like:
-            logging.error('Not yet implemented...')
+            edit_fetch_games(args.edit_games_like, db)
         else: #editing is mutually exclusive w/ fetch & publish
             if args.fetch:
                 newsids = db.get_fetch_games()

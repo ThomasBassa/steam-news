@@ -74,6 +74,28 @@ CREATE INDEX FetchIdx ON Games(shouldFetch, appid, name);''')
                     games.items())
             logger.info('Added %d new games to be fetched.', cur.rowcount)
 
+    def get_games_like(self, name: str):
+        #Since you can't do '%?%' in the SQL, do that here instead
+        name = name.strip().strip('%')
+        if name:
+            n = '%' + name + '%'
+            c = self.db.execute('''SELECT * FROM Games
+                WHERE name LIKE ? ORDER BY name''', (n,))
+        else:
+            c = self.db.execute('SELECT * FROM Games ORDER BY name')
+        return c.fetchall()
+
+    def disable_fetching_ids(self, appids):
+        with self.db as db:
+            #sadly can't use executemany() w/ a "bare" list-- each item needs to be a tuple
+            for aid in appids:
+                db.execute('UPDATE Games SET shouldFetch = 0 WHERE appid = ?', (aid,))
+
+    def enable_fetching_ids(self, appids):
+        with self.db as db:
+            for aid in appids:
+                db.execute('UPDATE Games SET shouldFetch = 1 WHERE appid = ?', (aid,))
+
     def get_fetch_games(self):
         c = self.db.execute('SELECT appid, name FROM Games WHERE shouldFetch != 0')
         return dict(c.fetchall())
