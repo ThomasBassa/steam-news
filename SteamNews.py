@@ -30,6 +30,8 @@ STEAM_APPIDS = {753: 'Steam',
         353380: 'Steam Link',
         358720: 'SteamVR Developer Hardware',
         596420: 'Steam Audio',
+        #593110 is the source for the megaphone icon in the client, not in appid list...
+        593110: 'Steam News',
         613220: 'Steam 360 Video Player'}
 
 

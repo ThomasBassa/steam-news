@@ -51,8 +51,17 @@ def rowToRSSItem(row, db: NewsDatabase):
         rsstitle = '[{}] {}'.format(games[0], rsstitle)
     #else game title is in article title, do nothing
 
+    source = row['feedlabel']
+    if not source:
+        #patch over missing feedname in Steam News;
+        # seems to be the only news source w/o feedlabels?
+        if row['feedname'] == 'steam_community_blog':
+            source = 'Steam Community Blog'
+        else:
+            #shrug.
+            source = row['feedname'] or 'Unknown Source'
     sources = '<p><i>Via <b>{}</b> for {}</i></p>\n'.format(
-            row['feedlabel'], ', '.join(games))
+            source, ', '.join(games))
 
     item = PyRSS2Gen.RSSItem(
         title=rsstitle,
@@ -65,8 +74,9 @@ def rowToRSSItem(row, db: NewsDatabase):
     return item
 
 # RE: BBCode http://bbcode.readthedocs.org/
-# note: feed_type is 1 for steam community announcements (feedname == 'steam_community_announcements') and 0 otherwise
-# this seems to be connected to the use of psuedo bbcode
+# note: feed_type is 1 for steam community announcements
+#  (feedname usually == 'steam_community_announcements') and 0 otherwise
+# this seems to be connected to the use of Steam's bbcode
 # see https://steamcommunity.com/comment/Recommendation/formattinghelp
 
 # Builtins: b, i, u, s, hr, sub, sup, list/*, quote (no author), code, center, color, url
@@ -115,31 +125,41 @@ def convertBBCodeToHTML(text):
         'noparse', '%(value)s', render_embedded=False, replace_cosmetic=False)  # see 'code'
     bb.add_simple_formatter('olist', '<ol>%(value)s</ol>', transform_newlines=False,
                             strip=True, swallow_trailing_newline=True)  # see 'list'
-    bb.add_simple_formatter(
-        'spoiler', '<span style="color: #000000;background-color: #000000;padding: 0px 8px;">%(value)s</span>')  # see 's' & above css
+    bb.add_simple_formatter('spoiler',
+            '<span style="color: #000000;background-color: #000000;padding: 0px 8px;">%(value)s</span>')  # see bbcode 's' & above css
 
     return bb.format(text)
 
+# Community img tags frequently look like
+# [img]{STEAM_CLAN_IMAGE}/27357479/d1048c635a5672f8efea79138bfd105b3cae552e.jpg[/img]
+# which should translate to <img src="https://steamcdn-a.akamaihd.net/steamcommunity/public/images/clans/27357479/d1048c635a5672f8efea79138bfd105b3cae552e.jpg">
+# e.g. {STEAM_CLAN_IMAGE} -> https://steamcdn-a.akamaihd.net/steamcommunity/public/images/clans
+# Steam News (official blog) has a newer tag type
+# {STEAM_CLAN_LOC_IMAGE}/27766192/45e4984a51cabcc390f9e1c1d2345da97f744851.gif becomes...
+# https://cdn.akamai.steamstatic.com/steamcommunity/public/images/clans/27766192/45e4984a51cabcc390f9e1c1d2345da97f744851.gif
+
+#sort of makes me wonder if these are interchangable...
+IMG_REPLACEMENTS = {
+    '{STEAM_CLAN_IMAGE}': 'https://steamcdn-a.akamaihd.net/steamcommunity/public/images/clans',
+    '{STEAM_CLAN_LOC_IMAGE}': 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/clans',
+}
+
+IMG = '<img style="display: inline-block; max-width: 100%;" src="{}"></img>'
 
 def render_img(tag_name, value, options, parent, context):
-    # Community img tags now frequently look like
-    # [img]{STEAM_CLAN_IMAGE}/27357479/d1048c635a5672f8efea79138bfd105b3cae552e.jpg[/img]
-    # which should translate to <img src="https://steamcdn-a.akamaihd.net/steamcommunity/public/images/clans/27357479/d1048c635a5672f8efea79138bfd105b3cae552e.jpg">
-    # e.g. {STEAM_CLAN_IMAGE} -> https://steamcdn-a.akamaihd.net/steamcommunity/public/images/clans
-    CLAN_IMG_MARK = '{STEAM_CLAN_IMAGE}'
-    CLAN_IMG_URL = 'https://steamcdn-a.akamaihd.net/steamcommunity/public/images/clans'
-    IMG = '<img style="display: inline-block; max-width: 100%;" src="{}"></img>'
-
-    src = value.replace(CLAN_IMG_MARK, CLAN_IMG_URL)
+    src = value
+    for mark, replaced in IMG_REPLACEMENTS.items():
+        src = src.replace(mark, replaced)
     return IMG.format(src)
 
+
+YT_TAG = '<a rel="nofollow" href="https://youtu.be/{0}">https://youtu.be/{0}</a>'
 
 def render_yt(tag_name, value, options, parent, context):
     # Youtube links in Steam posts look like
     # [previewyoutube=gJEgjiorUPo;full][/previewyoutube]
     # We *could* transform them into youtube embeds but
     # I'd rather have the choice to click on them, so just make them youtu.be links
-    YT_TAG = '<a rel="nofollow" href="https://youtu.be/{0}">https://youtu.be/{0}</a>'
     try:
         # grab everything between the '=' (options dict) and the ';'
         # TODO is there always a ;full component?
