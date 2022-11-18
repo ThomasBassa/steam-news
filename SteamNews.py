@@ -172,7 +172,11 @@ def edit_fetch_games(name, db: NewsDatabase):
         logger.info('Cancelled editing games.')
         return
     #Convert stderr output to set of int appids...
-    selected = frozenset(map(int, proc.stderr.strip().split('\n')))
+    out = proc.stderr.strip() #mainly to remove trailing newline
+    if out:
+        selected = frozenset(map(int, out.split('\n')))
+    else: #i.e. deselected everything, so output was empty
+        selected = frozenset()
     logger.debug('Before on: %s\nBefore off: %s\nSelected (enable): %s',
             before_on, before_off, selected)
     #disable: ids in before_on that are not in selected
