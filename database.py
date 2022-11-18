@@ -16,8 +16,11 @@ class NewsDatabase:
             self.db.row_factory = sqlite3.Row
             self.db.execute('PRAGMA foreign_keys = ON')
 
-    def close(self):
+    def close(self, optimize=True):
         if self.db:
+            if optimize:
+                logger.debug('Optimizing DB before close...')
+                self.db.execute('PRAGMA optimize')
             logger.debug('Closing DB @ %s', self.path)
             self.db.close()
             self.db = None
@@ -27,7 +30,8 @@ class NewsDatabase:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
+        #only do sqlite optimize if we didn't close via exception
+        self.close(optimize=exc_type is None)
         return False
 
     def first_run(self):
@@ -44,26 +48,28 @@ CREATE TABLE ExpireTimes(
     unixseconds INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE NewsItems(
     gid TEXT NOT NULL PRIMARY KEY,
-    title TEXT,
+    title TEXT NOT NULL,
     url TEXT,
     is_external_url INTEGER,
     author TEXT,
     contents TEXT,
     feedlabel TEXT,
-    date INTEGER,
+    date INTEGER NOT NULL DEFAULT (strftime('%s')),
     feedname TEXT,
     feed_type INTEGER,
-    appid INTEGER);
+    appid INTEGER NOT NULL);
 CREATE TABLE NewsSources(
     gid TEXT NOT NULL
         REFERENCES NewsItems(gid) ON DELETE CASCADE ON UPDATE CASCADE,
     appid INTEGER NOT NULL
         REFERENCES Games(appid) ON DELETE CASCADE ON UPDATE CASCADE,
     PRIMARY KEY(gid, appid));
-CREATE INDEX FetchIdx ON Games(shouldFetch, appid, name);''')
+CREATE INDEX NewsDateIdx ON NewsItems(date);''')
 
-        #TODO appid foreign keys might mess up? probably need to apply to NewsItems too
-        #TODO index(es) re: get_news_rows & get_source_names_for_item...
+        #having news item appid foreign key on games can break,
+        # since the news appid might not be the one we fetched against
+        #FK in NewsSources -> Games is fine, though removing entries
+        # from NewsSources could lead to loss of data useful for publishing...
         self.db.commit()
         logger.info('Created DB tables!')
 
@@ -129,8 +135,11 @@ CREATE INDEX FetchIdx ON Games(shouldFetch, appid, name);''')
 
     def get_news_rows(self):
         #TODO generator shenanigans instead of fetchall()?
-        #TODO filter < 30-ish days old instead of LIMIT
-        c = self.db.execute('SELECT * FROM NewsItems ORDER BY date DESC LIMIT 100')
+        #sadly our sqlite3 version isn't new enough for unixepoch()
+        # so we have to use strftime('%s') for sqlite to make a unix timestamp
+        c = self.db.execute('''SELECT * FROM NewsItems
+            WHERE date >= strftime('%s', 'now', '-30 day')
+            ORDER BY date DESC''')
         return c.fetchall()
 
     def get_source_names_for_item(self, gid):
