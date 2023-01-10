@@ -120,9 +120,12 @@ def saveRecentNews(news: dict, db: NewsDatabase):
     save all "recent" news items to the DB"""
     db.update_expire_time(news['appnews']['appid'], news['expires'])
 
+    current_entries = 0
     for ned in news['appnews']['newsitems']:
         if not isNewsOld(ned):
             db.insert_news_item(ned)
+            current_entries += 1
+    return current_entries
 
 
 def getAllRecentNews(newsids: dict, db: NewsDatabase):
@@ -137,9 +140,9 @@ def getAllRecentNews(newsids: dict, db: NewsDatabase):
         else:
             news = getNewsForAppID(aid)
             if 'appnews' in news: # success
-                saveRecentNews(news, db)
+                cur_entries = saveRecentNews(news, db)
                 newhits += 1
-                logger.info('Fetched %d: %s OK!', aid, name)
+                logger.info('Fetched %d: %s OK; %d current items', aid, name, cur_entries)
                 time.sleep(0.25)
             else:
                 fails += 1
