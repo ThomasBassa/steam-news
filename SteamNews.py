@@ -142,7 +142,10 @@ def getAllRecentNews(newsids: dict, db: NewsDatabase):
             if 'appnews' in news: # success
                 cur_entries = saveRecentNews(news, db)
                 newhits += 1
-                logger.info('Fetched %d: %s OK; %d current items', aid, name, cur_entries)
+                if cur_entries:
+                    logger.info('Fetched %d: %s OK; %d current items', aid, name, cur_entries)
+                else:
+                    logger.info('Fetched %d: %s OK; nothing current', aid, name)
                 time.sleep(0.25)
             else:
                 fails += 1
