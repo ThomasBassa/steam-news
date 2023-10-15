@@ -130,6 +130,7 @@ def saveRecentNews(news: dict, db: NewsDatabase):
 
 def getAllRecentNews(newsids: dict, db: NewsDatabase):
     """Given a dict of appids to names, store all "recent" items, respecting the cache"""
+    total_current = 0
     cachehits = 0
     newhits = 0
     fails = 0
@@ -144,6 +145,7 @@ def getAllRecentNews(newsids: dict, db: NewsDatabase):
                 newhits += 1
                 if cur_entries:
                     logger.info('Fetched %d: %s OK; %d current items', aid, name, cur_entries)
+                    total_current += cur_entries
                 else:
                     logger.info('Fetched %d: %s OK; nothing current', aid, name)
                 time.sleep(0.25)
@@ -152,8 +154,8 @@ def getAllRecentNews(newsids: dict, db: NewsDatabase):
                 logger.error('%d: %s fetch error: %s', aid, name, news['error'])
                 time.sleep(1)
 
-    logger.info('Run complete. %d cached, %d fetched, %d failed',
-            cachehits, newhits, fails)
+    logger.info('Run complete. %d cached, %d fetched, %d failed; %d current news items',
+            cachehits, newhits, fails, total_current)
 
 def edit_fetch_games(name, db: NewsDatabase):
     logger.info('Editing games like "%s"', name)
@@ -203,10 +205,10 @@ def edit_fetch_games(name, db: NewsDatabase):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--first-run', action='store_true')
-    parser.add_argument('-a', '--add-profile-games') # + steam ID/vanity url
+    parser.add_argument('-a', '--add-profile-games', metavar='Steam ID|Vanity url')
     parser.add_argument('-f', '--fetch', action='store_true')
-    parser.add_argument('-p', '--publish') # + path to XML output
-    parser.add_argument('-g', '--edit-games-like') # + partial name of game
+    parser.add_argument('-p', '--publish', metavar='XML output path')
+    parser.add_argument('-g', '--edit-games-like', metavar='partial title')
     parser.add_argument('-v', '--verbose', action='store_true')
     #TODO maybe arg for DB path...?
     args = parser.parse_args()
