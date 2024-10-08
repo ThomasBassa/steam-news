@@ -1,0 +1,46 @@
+services:
+  app:
+    image: steam-news
+    container_name: steam-news
+    build:
+      context: .
+    volumes:
+      - db:/db
+      - feed:/feed
+    networks:
+      - steam-news
+
+
+  webserver:
+    image: caddy:2.8.4-alpine
+    volumes:
+      - feed:/srv:ro
+      - db:/db
+    command: caddy file-server
+    ports:
+      - 3012:80
+    networks:
+      - steam-news
+    depends_on:
+      - ofelia
+ 
+
+  ofelia:
+    image: mcuadros/ofelia:latest
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      ofelia.enabled: "true"
+      ofelia.job-run.app.schedule: "@every 1h"
+      ofelia.job-run.app.container: "steam-news"
+      ofelia.job-run.app.no-overlap: 
+    networks:
+      - steam-news
+ 
+volumes:
+  feed:
+  db:
+
+networks:
+  steam-news:

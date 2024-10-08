@@ -210,7 +210,7 @@ def main():
     parser.add_argument('-p', '--publish', metavar='XML output path')
     parser.add_argument('-g', '--edit-games-like', metavar='partial title')
     parser.add_argument('-v', '--verbose', action='store_true')
-    #TODO maybe arg for DB path...?
+    parser.add_argument('-d', '--database', metavar='path to sqlite file')
     args = parser.parse_args()
 
     lvl = logging.INFO if not args.verbose else logging.DEBUG
@@ -218,7 +218,7 @@ def main():
             format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
             level=lvl)
 
-    with NewsDatabase() as db:
+    with NewsDatabase(args.database) as db:
         if args.first_run:
             db.first_run()
 
