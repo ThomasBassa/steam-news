@@ -77,7 +77,7 @@ Run `docker compose up -d`. It will run the steam news updater and serve the xml
 
 You can adjust the cron values in the `docker-compose.yaml` file.
 
-All commands can just be appended like `docker cimpose run app -g silly-game`.
+All commands can just be appended like `docker compose run app -g silly-game`.
 
 # Licence
 MIT, go nuts.
