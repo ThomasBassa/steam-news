@@ -80,8 +80,8 @@ def rowToRSSItem(row, db: NewsDatabase):
 # see https://steamcommunity.com/comment/Recommendation/formattinghelp
 
 # Builtins: b, i, u, s, hr, sub, sup, list/*, quote (no author), code, center, color, url
-# Steam: h1, h2, h3, b, u, i, strike, spoiler, noparse, url, list/*, olist/*, quote=author, code, table[tr[th, td]], previewyoutube
-# More from Steam not in above url: img
+# Steam: h1, h2, h3, b, u, i, strike, spoiler, noparse, url, list/*, olist/*, quote=author, code, table[tr[th, td]]
+# More from Steam not in above url: img, p, previewyoutube, dynamiclink
 # Adding: h1, h2, h3, strike, spoiler, noparse, olist (* already covered), table, tr, th, td, previewyoutube
 # Ignoring special quote
 
@@ -114,11 +114,17 @@ def convertBBCodeToHTML(text):
     for tag in ('strike', 'table', 'tr', 'th', 'td', 'h1', 'h2', 'h3'):
         bb.add_simple_formatter(tag, '<{0}>%(value)s</{0}>'.format(tag))
 
+    #If using [p] for input then don't need <br> in the output?
+    bb.add_simple_formatter('p', '<p>%(value)s</p>', strip=True, transform_newlines=False)
+
     #bb.add_simple_formatter('img', '<img style="display: inline-block; max-width: 100%%;" src="%(value)s"></img>', strip=True, replace_links=False)
     bb.add_formatter('img', render_img, strip=True, replace_links=False)
 
     bb.add_formatter('previewyoutube', render_yt,
-                     strip=True, replace_links=True)
+                     strip=True, replace_links=False)
+
+    bb.add_formatter('dynamiclink', render_dynlink,
+                     strip=True, replace_links=False)
 
     # The extra settings here are roughly based on the default formatters seen in the bbcode module source
     bb.add_simple_formatter(
@@ -147,10 +153,12 @@ IMG_REPLACEMENTS = {
     '{STEAM_CLAN_LOC_IMAGE}': 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/clans',
 }
 
-IMG = '<img style="display: inline-block; max-width: 100%;" src="{}"></img>'
+IMG = '<img style="display: inline-block; max-width: 100%;" src="{}" />'
 
 def render_img(tag_name, value, options, parent, context):
-    src = value
+    src = value or options['src']
+    if not src:
+        return ''
     for mark, replaced in IMG_REPLACEMENTS.items():
         src = src.replace(mark, replaced)
     return IMG.format(src)
@@ -170,6 +178,15 @@ def render_yt(tag_name, value, options, parent, context):
         return YT_TAG.format(yt_id)
     except (KeyError, ValueError):
         # TODO uhh... look at https://dcwatson.github.io/bbcode/formatters/ again
+        return ''
+
+def render_dynlink(tag_name, value, options, parent, context):
+    # [dynamiclink href="https://store.steampowered.com/app/2306620/Risk_of_Rain_2_Seekers_of_the_Storm/"][/dynamiclink]
+    # should output just a regular ol <a>
+    try:
+        url = options['href']
+        return f'<a rel="nofollow" href="{url}">{url}</a>'
+    except (KeyError, ValueError):
         return ''
 
 def publish(db: NewsDatabase, output_path=None):
