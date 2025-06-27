@@ -66,5 +66,18 @@ python3 -m pip install -r requirements.txt
 You'll also want the `whiptail` program installed for the terminal interface to edit
 which games to fetch; otherwise you'll need to use the `sqlite3` program directly.
 
+## Running with docker
+
+### First start
+Run `docker compose run app --first-run -a YOUR-STEAM-ID`
+
+
+### Usage
+Run `docker compose up -d`. It will run the steam news updater and serve the xml under `localhost:3012/steam-news.xml`.
+
+You can adjust the cron values in the `docker-compose.yaml` file.
+
+All commands can just be appended like `docker compose run app -g silly-game`.
+
 # Licence
 MIT, go nuts.
